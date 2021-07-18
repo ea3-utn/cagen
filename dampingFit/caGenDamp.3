@@ -1,0 +1,216 @@
+# coding=utf-8
+# ----------------------------------------------------------------------------------------------------------
+#  .d8888b.        d8888  .d8888b.  8888888888 888b    888 
+# d88P  Y88b      d88888 d88P  Y88b 888        8888b   888  
+# 888    888     d88P888 888    888 888        88888b  888  
+# 888           d88P 888 888        8888888    888Y88b 888     ____  ___    __  _______  _____   ________
+# 888          d88P  888 888  88888 888        888 Y88b888    / __ \/   |  /  |/  / __ \/  _/ | / / ____/ 
+# 888    888  d88P   888 888    888 888        888  Y88888   / / / / /| | / /|_/ / /_/ // //  |/ / / __  
+# Y88b  d88P d8888888888 Y88b  d88P 888        888   Y8888  / /_/ / ___ |/ /  / / ____// // /|  / /_/ /  
+#  "Y8888P" d88P     888  "Y8888P88 8888888888 888    Y888 /_____/_/  |_/_/  /_/_/   /___/_/ |_/\____/   
+#------------------------------------------------------------------------------ -----------------------------
+# Cátedra de Estructuras Aeronáuticas III y Laboratorio de Estructuras
+# Universidad Tecnológica Nacional, Facultad Regional Haedo                                           
+#--------------------------------------------------------------------------------------------------------------
+# Script .3 | Instrucciones CodeAster >Caracteristicas Material, Matrices, Cond.Contorno, y Analisis Armonico
+#--------------------------------------------------------------------------------------------------------------
+#
+# --------  CONFIGURACION INICIAL -----------------------------------------------------------------------------
+
+DEBUT();
+
+# ASIGNAR CUALQUIER VALOR A LAS VARIABLES INDEPENDIENTES, DEBEN ESTAR DEFINIDAS.
+
+ALPHA__ = 9.E-5;
+
+BETA__ = 13.;
+
+frecExperimental=[1.18492462e+01, 3.40100503e+01, 7.34070352e+01];
+
+acceExperimental=[1.56893912e+00, 1.39931802e-01, 9.88253436e-01]
+
+# -------------- 
+
+mesh = LIRE_MAILLAGE(FORMAT='MED',
+                     UNITE=20)
+
+modelV = AFFE_MODELE(AFFE=_F(MODELISATION=('POU_D_E', ),
+                             PHENOMENE='MECANIQUE',
+                             TOUT='OUI'),
+                     MAILLAGE=mesh)
+
+elemproV = AFFE_CARA_ELEM(MODELE=modelV,
+                          POUTRE=_F(CARA=('IZ', 'A', 'IY', 'JX'),
+                                    GROUP_MA=('edges', ),
+                                    SECTION='GENERALE',
+                                    VALE=(1.6526e-12, 1.639e-5, 1.0, 1.0)))
+
+acero = DEFI_MATERIAU(ELAS=_F(E=187822563602.0,
+                              NU=0.33,
+                              RHO=10900.6127287))
+
+fieldma0 = AFFE_MATERIAU(AFFE=_F(GROUP_MA=('edges', ),
+                                 MATER=(acero, )),
+                         MAILLAGE=mesh,
+                         MODELE=modelV)
+
+BIDIZ = AFFE_CHAR_MECA(DDL_IMPO=(_F(DRZ=0.0,
+                                    DX=0.0,
+                                    DY=0.0,
+                                    GROUP_NO=('CC', )),
+                                 _F(DRX=0.0,
+                                    DRY=0.0,
+                                    DZ=0.0,
+                                    TOUT='OUI')),
+                       MODELE=modelV)
+
+
+M_EL_RIG=CALC_MATR_ELEM(OPTION='RIGI_MECA',
+                        MODELE=modelV,
+                        CHAM_MATER=fieldma0,
+                        CARA_ELEM=elemproV,
+                        CHARGE=BIDIZ,
+                        );
+
+M_EL_MAS=CALC_MATR_ELEM(OPTION='MASS_MECA',
+                        MODELE=modelV,
+                        CHAM_MATER=fieldma0,
+                        CARA_ELEM=elemproV,
+                        CHARGE=BIDIZ,
+                        );
+
+NU=NUME_DDL(MATR_RIGI=M_EL_RIG,);
+
+K=ASSE_MATRICE(MATR_ELEM=M_EL_RIG,
+                      NUME_DDL=NU,);
+
+M=ASSE_MATRICE(MATR_ELEM=M_EL_MAS,
+                      NUME_DDL=NU,);
+
+
+modes = CALC_MODES(CALC_FREQ=_F(NMAX_FREQ=120),
+		   MATR_RIGI=K,	
+		   MATR_MASS=M,                   
+                   OPTION='PLUS_PETITE')
+
+# ----------------- ANALISIS ARMONICO
+
+# ACCE = FORMULE(NOM_PARA=('INST', ),
+#                VALE='0.209426*sin(91.18478288034662*INST)')
+
+
+# freqList = DEFI_LIST_REEL(DEBUT=70.0,
+                          # INTERVALLE=_F(JUSQU_A=100,
+                          #               PAS=0.5))
+
+freqList = DEFI_LIST_REEL ( VALE = frecExperimental,)
+                          
+MULT_Y = CALC_CHAR_SEISME(DIRECTION=(0.0, 1.0, 0.0),
+                          MATR_MASS=M,
+                          MONO_APPUI='OUI')
+
+listr = CALC_AMOR_MODAL(AMOR_RAYLEIGH=_F(AMOR_ALPHA=ALPHA__,
+                                         AMOR_BETA=BETA__,
+                                         MODE_MECA=modes))
+
+matC = COMB_MATR_ASSE(COMB_R=(_F(COEF_R=ALPHA__,
+                                 MATR_ASSE=K),
+                              _F(COEF_R=BETA__,
+                                 MATR_ASSE=M)))
+
+PROJ_BASE(BASE=modes,
+          MATR_ASSE_GENE=(_F(MATRICE=CO('MG'),
+                             MATR_ASSE=M),
+                          _F(MATRICE=CO('KG'),
+                             MATR_ASSE=K),
+                          _F(MATRICE=CO('CG'),
+                             MATR_ASSE=matC)),
+          VECT_ASSE_GENE=_F(TYPE_VECT='FORC',
+                            VECTEUR=CO('VECT_Y'),
+                            VECT_ASSE=MULT_Y))
+
+
+harm = DYNA_VIBRA(BASE_CALCUL='GENE',
+                  MATR_AMOR=CG,
+                  MATR_MASS=MG,
+                  MATR_RIGI=KG,
+                  EXCIT=_F(COEF_MULT=0.209426,
+                           VECT_ASSE_GENE=VECT_Y),
+                  LIST_FREQ=freqList,
+#                  FREQ=(11, ),
+                  TYPE_CALCUL='HARM')
+
+
+resHarm = REST_GENE_PHYS(GROUP_NO=('N3'),
+                         LIST_FREQ=freqList,
+ #                        FREQ=(11, ),
+                         RESU_GENE=harm,
+                         TOUT_CHAM='OUI')
+
+
+# ----------------- RESULTADO EN FORMATO TABLA
+
+#calcul = [['REPONSE1','FREQ','ACCE']]
+
+
+FUNC1 = RECU_FONCTION(GROUP_NO=('N3', ),
+       #               FREQ=(11, ),
+                      LIST_FREQ=freqList,
+                      NOM_CHAM='ACCE',
+                      NOM_CMP='DY',
+                      RESULTAT=resHarm)
+
+# func2d1 = CALC_FONC_INTERP(FONCTION=FUNC1,
+#                            INTERPOL=('LIN', ),
+#                            LIST_PARA=freqList,
+#                            NOM_PARA='FREQ',
+#                            NOM_RESU='ACCE')
+
+
+# REPONSE1 = CREA_TABLE(FONCTION=_F(FONCTION=func2d1))
+
+
+# Transformacion de la funcion en tabla
+
+REPONSE1=CREA_TABLE(FONCTION=_F(FONCTION=FUNC1,),);
+
+# Calculo del modulo
+
+moduly = FORMULE(VALE='sqrt(DY_R**2+DY_I**2)',
+                 NOM_PARA=('DY_R','DY_I',),);
+
+# Agrego columna con calculo de modulo
+
+REPONSE1 = CALC_TABLE(reuse =REPONSE1,
+                      TABLE=REPONSE1,
+                      ACTION=_F(OPERATION='OPER',
+                                FORMULE=moduly,
+                                NOM_PARA='MODYL',),);
+
+# AGREGO COLUMNA CON LOS VALORES DE LA EXPERIENCIA
+
+REPONSE1 = CALC_TABLE(reuse =REPONSE1,
+                  TABLE=REPONSE1,
+                  ACTION=_F(
+                      OPERATION='AJOUT_COLONNE',
+                      NOM_PARA='EXPERIENCIA',
+                      #VALE_COLONNE=(1.56893912e+00, 1.39931802e-01, 9.88253436e-01,),),);
+                      VALE_COLONNE=acceExperimental,),);
+                 
+
+# CALCULO EL ERROR CON RESPECTO A LA SIMULACION
+
+ERROR = FORMULE(VALE='EXPERIENCIA-MODYL',
+                 NOM_PARA=('EXPERIENCIA','MODYL',),);
+
+
+# Agrego columna con calculo deL ERROR
+
+REPONSE1 = CALC_TABLE(reuse =REPONSE1,
+                      TABLE=REPONSE1,
+                      ACTION=_F(OPERATION='OPER',
+                                FORMULE=ERROR,
+                                NOM_PARA='ERROR',),);
+
+                      
+FIN();

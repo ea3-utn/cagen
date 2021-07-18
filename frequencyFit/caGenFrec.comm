@@ -1,0 +1,170 @@
+# coding=utf-8
+# ------------------------------------------------------------------------------------------------------------
+#  .d8888b.        d8888  .d8888b.  8888888888 888b    888     
+# d88P  Y88b      d88888 d88P  Y88b 888        8888b   888       
+# 888    888     d88P888 888    888 888        88888b  888        
+# 888           d88P 888 888        8888888    888Y88b 888   
+# 888          d88P  888 888  88888 888        888 Y88b888  _____ _____ _____ _____  
+# 888    888  d88P   888 888    888 888        888  Y88888 |   __| __  |   __|     |    
+# Y88b  d88P d8888888888 Y88b  d88P 888        888   Y8888 |   __|    -|   __|  |  |    
+#  "Y8888P" d88P     888  "Y8888P88 8888888888 888    Y888 |__|  |__|__|_____|__  _|
+#------------------------------------------------------------------------------ |__|--------------------------
+# Cátedra de Estructuras Aeronáuticas III y Laboratorio de Estructuras
+# Universidad Tecnológica Nacional, Facultad Regional Haedo
+#--------------------------------------------------------------------------------------------------------------
+# Script Principal | Ajutar frecuencias naturales en funcion de la densidad y la elasticidad
+#--------------------------------------------------------------------------------------------------------------
+#
+# --------  CONFIGURACION INICIAL -----------------------------------------------------------------------------
+
+DEBUT(CODE=_F(NIV_PUB_WEB='INTERNET',),DEBUG=_F(SDVERI='OUI'))
+
+import sys
+import os
+import os.path as osp
+import glob
+from distutils.sysconfig import get_python_lib
+
+import numpy as np
+import os
+from geneticalgorithm import geneticalgorithm as ga
+
+from datetime import datetime
+
+ROOT = os.getcwd()
+
+# Recuperation du chemin du fichier macr_recal_ops.py
+import Macro
+commande = osp.join(osp.dirname(Macro.__file__), 'recal.py')
+
+from Utilitai.System import ExecCommand
+from asrun.profil import AsterProfil
+import aster
+
+# Objetive type Float
+arguments = ' --objective=fcalc --objective_type=float --gradient_type=no --mr_parameters=fort.2 '
+
+# Objetive type Error
+#arguments = ' --objective=error --objective_type=float --gradient_type=adim --mr_parameters=fort.2 '
+commande = '%s %s %s' % (sys.executable, commande, arguments)
+
+# Parametres
+fichier_out      = 'output.txt'
+fichier_grad_out = 'grad.txt'
+
+# Affichage des outputs esclaves ou non
+verbose = True
+
+# ---- VARIABLES DEFINIDAS POR EL USUARIO -------------------------------------------------------------------
+
+# ATENCION: Los extremos de las variables deben estar definidos en orden ALFABETICO
+
+#                           DENSIDAD__       YOUNG__   
+valoresExtremos=np.array([[10821.,14640],[1.81e11,2.45e11]])
+
+print('valores extr',valoresExtremos)
+
+# Parametros del Algoritmo Genetico
+parametros = {'max_num_iteration':5,\
+                   'population_size':10,\
+                   'mutation_probability':0.1,\
+                   'elit_ratio': 0.01,\
+                   'crossover_probability': 0.5,\
+                   'parents_portion': 0.3,\
+                   'crossover_type':'uniform',\
+                   'max_iteration_without_improv':None}
+
+# ----------       FUNCIONES     -----------------------------------------------------------------------------
+def fonction(val):
+   """
+      Calcul de F et eventuellement G par Aster
+   """
+
+   # Affichage
+   print(val)
+
+   # Menage
+   try:    os.remove(fichier_grad_out)
+   except: pass
+
+
+   # Objetive type Error
+   #cmd = commande + '--input_step="%s" ' % ','.join( [ str(1e-3) for x in val ] ) + ' --input="%s"' % ','.join( [ str(x) for x in val ] )
+
+   # Objetive type float
+   cmd = commande + ' --input="%s"' % ','.join( [ str(x) for x in val ] )
+
+   # Execution de Code_Aster
+   iret = ExecCommand(cmd, follow_output=verbose, verbose=verbose)
+
+   # Lecture du fichier de F
+   try:
+      f=open(fichier_out, 'r')
+      txt = f.read()
+      f.close()
+      fval = float(txt)
+   except:
+      raise aster.error("<F> Probleme : impossible de lire le fichier de la fonction F : %s" % fichier_out)
+
+   # Affichage
+   print('  --> fonctionnelle : ' + str(fval))
+
+   # Lecture du fichier de G (option -G normal ou -G adim)
+   if os.path.isfile(fichier_grad_out):
+      try:
+         f=open(fichier_grad_out, 'r')
+         txt = f.read()
+         f.close()
+         gval = [ float(x) for x in txt.split(',') ]
+      except:
+         raise aster.error("<F> Probleme : impossible de lire le fichier de la fonction G: %s" % fichier_grad_out)
+
+      # Affichage
+      print('  --> gradient : ' + str(gval))
+      return fval, gval
+
+   return fval
+
+# ------------------------------------------------------------
+# Modification du profil .export
+# - Le fichier fort.3 devient le nouveau .comm
+# - On fixe les noms des fichiers esclave (fort.3) et maillage (fort.20)
+# - On retire du profil tous les fichiers resultats
+liste = glob.glob('*.export')
+fichier_export = liste[0]
+prof = AsterProfil(fichier_export)
+for lab in ('data', 'resu'):
+   l_fr = getattr(prof, lab)
+   l_tmp = l_fr[:]
+   for dico in l_tmp:
+      # fichiers
+      if not dico['isrep']:
+         # Le fichier d'UL 3 est le nouveau .comm
+         if dico['type'] == 'comm' and dico['ul'] == 1:
+            dico['path'] = os.path.join(ROOT, 'fort.3')
+
+            # On supprime tous les fichiers resultats
+            if lab == 'resu': l_fr.remove(dico)
+   setattr(prof, lab, l_fr)
+# Ecriture du nouveau fichier export
+prof.WriteExportTo(fichier_export)
+
+# ----------  SCRIPT ---------------------------------------------------------------------------
+
+n=len(valoresExtremos)
+
+print("-------- caGen --------\n")
+
+print(">>Fecha y hora: ", datetime.now(),"\n")
+
+print(">>Parametros del Algoritmo:\n",parametros)
+
+print(">>Cantidad de variables: ",n)
+
+print(">>Valores Extremos: \n",valoresExtremos)
+
+model=ga(function=fonction,dimension=n,variable_type='real',variable_boundaries=valoresExtremos,algorithm_parameters=parametros)
+
+model.run()
+
+FIN()

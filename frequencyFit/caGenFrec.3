@@ -1,0 +1,124 @@
+# coding=utf-8
+# ------------------------------------------------------------------------------------------------------------
+#  .d8888b.        d8888  .d8888b.  8888888888 888b    888     
+# d88P  Y88b      d88888 d88P  Y88b 888        8888b   888       
+# 888    888     d88P888 888    888 888        88888b  888        
+# 888           d88P 888 888        8888888    888Y88b 888   
+# 888          d88P  888 888  88888 888        888 Y88b888  _____ _____ _____ _____  
+# 888    888  d88P   888 888    888 888        888  Y88888 |   __| __  |   __|     |    
+# Y88b  d88P d8888888888 Y88b  d88P 888        888   Y8888 |   __|    -|   __|  |  |    
+#  "Y8888P" d88P     888  "Y8888P88 8888888888 888    Y888 |__|  |__|__|_____|__  _|
+#------------------------------------------------------------------------------ |__|--------------------------
+# Cátedra de Estructuras Aeronáuticas III y Laboratorio de Estructuras
+# Universidad Tecnológica Nacional, Facultad Regional Haedo
+#--------------------------------------------------------------------------------------------------------------
+# Script .3 | Instrucciones CodeAster >Caracteristicas Material, Matrices, Cond.Contorno y Modos de vibracion
+#--------------------------------------------------------------------------------------------------------------
+#
+# --------  CONFIGURACION INICIAL -----------------------------------------------------------------------------
+
+DEBUT();
+
+# ASIGNAR CUALQUIER VALOR A LAS VARIABLES INDEPENDIENTES, DEBEN ESTAR DEFINIDAS.
+
+YOUNG__ = 2.1E11;
+
+DENSIDAD__ = 7850.;
+
+frecExperimental=[1.18e+01, 7.38e+01];
+
+# -------------- 
+
+mesh = LIRE_MAILLAGE(FORMAT='MED',
+                     UNITE=20)
+
+modelV = AFFE_MODELE(AFFE=_F(MODELISATION=('POU_D_E', ),
+                             PHENOMENE='MECANIQUE',
+                             TOUT='OUI'),
+                     MAILLAGE=mesh)
+
+elemproV = AFFE_CARA_ELEM(MODELE=modelV,
+                          POUTRE=_F(CARA=('IZ', 'A', 'IY', 'JX'),
+                                    GROUP_MA=('edges', ),
+                                    SECTION='GENERALE',
+                                    VALE=(1.6526e-12, 1.639e-5, 1.0, 1.0)))
+
+acero = DEFI_MATERIAU(ELAS=_F(E=YOUNG__,
+                              NU=0.33,
+                              RHO=DENSIDAD__))
+
+fieldma0 = AFFE_MATERIAU(AFFE=_F(GROUP_MA=('edges', ),
+                                 MATER=(acero, )),
+                         MAILLAGE=mesh,
+                         MODELE=modelV)
+
+BIDIZ = AFFE_CHAR_MECA(DDL_IMPO=(_F(DRZ=0.0,
+                                    DX=0.0,
+                                    DY=0.0,
+                                    GROUP_NO=('CC', )),
+                                 _F(DRX=0.0,
+                                    DRY=0.0,
+                                    DZ=0.0,
+                                    TOUT='OUI')),
+                       MODELE=modelV)
+
+
+M_EL_RIG=CALC_MATR_ELEM(OPTION='RIGI_MECA',
+                        MODELE=modelV,
+                        CHAM_MATER=fieldma0,
+                        CARA_ELEM=elemproV,
+                        CHARGE=BIDIZ,
+                        );
+
+M_EL_MAS=CALC_MATR_ELEM(OPTION='MASS_MECA',
+                        MODELE=modelV,
+                        CHAM_MATER=fieldma0,
+                        CARA_ELEM=elemproV,
+                        CHARGE=BIDIZ,
+                        );
+
+NU=NUME_DDL(MATR_RIGI=M_EL_RIG,);
+
+K=ASSE_MATRICE(MATR_ELEM=M_EL_RIG,
+                      NUME_DDL=NU,);
+
+M=ASSE_MATRICE(MATR_ELEM=M_EL_MAS,
+                      NUME_DDL=NU,);
+
+
+modes = CALC_MODES(CALC_FREQ=_F(NMAX_FREQ=2),
+		   MATR_RIGI=K,	
+		   MATR_MASS=M,                   
+                   OPTION='PLUS_PETITE')
+
+REPONSE1 = RECU_TABLE(CO=modes,
+                    NOM_PARA=('FREQ', ))
+
+# AGREGO COLUMNA CON LOS VALORES DE LA EXPERIENCIA
+
+REPONSE1 = CALC_TABLE(reuse =REPONSE1,
+                  TABLE=REPONSE1,
+                  ACTION=_F(
+                      OPERATION='AJOUT_COLONNE',
+                      NOM_PARA='EXPERIENCIA',
+                      #VALE_COLONNE=(1.56893912e+00, 1.39931802e-01, 9.88253436e-01,),),);
+                      VALE_COLONNE=frecExperimental,),);
+
+
+# CALCULO EL ERROR CON RESPECTO A LA SIMULACION
+
+ERROR = FORMULE(VALE='EXPERIENCIA-FREQ',
+                 NOM_PARA=('EXPERIENCIA','FREQ',),);
+
+
+# Agrego columna con calculo deL ERROR
+
+REPONSE1 = CALC_TABLE(reuse =REPONSE1,
+                      TABLE=REPONSE1,
+                      ACTION=_F(OPERATION='OPER',
+                                FORMULE=ERROR,
+                                NOM_PARA='ERROR',),);
+
+
+
+FIN();

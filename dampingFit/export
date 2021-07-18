@@ -1,0 +1,41 @@
+P actions make_etude
+P aster_root ASTER_ROOT_DIR
+P consbtc oui
+P corefilesize unlimited
+P cpresok RESNOOK
+P debug nodebug
+P display HOSTNAME_ASTER:0
+P facmtps 1
+P lang en
+P mclient HOSTNAME_ASTER
+P memjob 4194304
+P memory_limit 4096.0
+P mode interactif
+P mpi_nbcpu 1
+P mpi_nbnoeud 1
+P nbmaxnook 5
+P ncpus 1
+P noeud HOSTNAME_ASTER
+P nomjob caGenDampingFit
+P origine ASTK 2020.0.final
+P platform LINUX64
+P protocol_copyfrom asrun.plugins.server.SCPServer
+P protocol_copyto asrun.plugins.server.SCPServer
+P protocol_exec asrun.plugins.server.SSHServer
+P proxy_dir /tmp
+P rep_trav /tmp/nico-HOSTNAME_ASTER-interactif_7326_dampingFit
+P serveur HOSTNAME_ASTER.HOSTNAME_ASTERroot
+P soumbtc oui
+P time_limit 9000000.0
+P tpsjob 150001
+P uclient USER_ASTER
+P username USER_ASTER
+P version stable
+A args 
+A memjeveux 512.0
+A tpmax 9000000.0
+F comm CURRENT_ASTER/dampingFit/caGenDamp.comm D  1
+F mail CURRENT_ASTER/mesh.med D  20
+F libr CURRENT_ASTER/dampingFit/caGenDamp.2 D  2
+F libr CURRENT_ASTER/dampingFit/caGenDamp.3 D  3
+F mess CURRENT_ASTER/dampingFit/caGenDamp.mess R  6
