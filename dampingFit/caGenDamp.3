@@ -43,11 +43,11 @@ elemproV = AFFE_CARA_ELEM(MODELE=modelV,
                           POUTRE=_F(CARA=('IZ', 'A', 'IY', 'JX'),
                                     GROUP_MA=('edges', ),
                                     SECTION='GENERALE',
-                                    VALE=(1.6526e-12, 1.639e-5, 1.0, 1.0)))
+                                    VALE=(1.95112e-12, 1.74e-5, 1.0, 1.0)))
 
-acero = DEFI_MATERIAU(ELAS=_F(E=187822563602.0,
+acero = DEFI_MATERIAU(ELAS=_F(E=203555360621.0,
                               NU=0.33,
-                              RHO=10900.6127287))
+                              RHO=14003.7128535))
 
 fieldma0 = AFFE_MATERIAU(AFFE=_F(GROUP_MA=('edges', ),
                                  MATER=(acero, )),
